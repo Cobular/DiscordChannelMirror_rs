@@ -1,0 +1,14 @@
+[package]
+name = "discord_channel_mirror_rs"
+version = "0.1.0"
+authors = ["Cobular <22972550+Cobular@users.noreply.github.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serenity = { version = "0.10", default-features = false, features = ["client", "model", "rustls_backend", "gateway"] }
+tokio = { version = "1.14.0", features = ["macros", "rt-multi-thread"] }
+lazy_static = "1.4.0"
+dotenv = "0.15.0"
+dotenv_codegen = "0.15.0"
