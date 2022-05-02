@@ -9,6 +9,7 @@ use serenity::{
     model::{channel::Message, id::ChannelId},
 };
 use std::env;
+use std::time::Instant;
 
 lazy_static! {
     static ref CHANNEL_ID: ChannelId = ChannelId(
@@ -30,6 +31,7 @@ struct Handler;
 #[async_trait]
 impl EventHandler for Handler {
     async fn message(&self, ctx: Context, incoming_message: Message) {
+        let start = Instant::now();
         if incoming_message.channel_id == *CHANNEL_ID {
             let webhook = ctx
                 .http
@@ -66,7 +68,7 @@ impl EventHandler for Handler {
 
             match webhook_res {
                 Ok(_) => {
-                    println!("Webhook sent successfully")
+                    println!("Webhook sent successfully, took {:.2?}", start.elapsed());
                 }
                 Err(e) => {
                     eprintln!("{:?}", e)

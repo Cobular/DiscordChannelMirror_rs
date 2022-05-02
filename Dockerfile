@@ -1,7 +1,5 @@
-FROM rust:latest AS builder
+FROM rust:slim-buster AS builder
 
-RUN rustup target add x86_64-unknown-linux-musl
-RUN apt update && apt install -y musl-tools musl-dev
 RUN update-ca-certificates
 
 # Create appuser
@@ -20,14 +18,22 @@ RUN adduser \
 
 WORKDIR /discord_channel_mirror_rs
 
+# Build once with dummy data to cache build artifacts
+COPY ./Cargo.toml .
+COPY ./Cargo.lock .
+RUN mkdir ./src && echo 'fn main() { println!("Dummy!"); }' > ./src/main.rs
+RUN cargo build --release
+RUN rm -rf ./src
+
+# Now copy our stuff and build again
 COPY ./ .
 
-RUN cargo build --target x86_64-unknown-linux-musl --release
+RUN cargo build --release
 
 ####################################################################################################
 ## Final image
 ####################################################################################################
-FROM scratch
+FROM debian:buster-slim
 
 # Import from builder.
 COPY --from=builder /etc/passwd /etc/passwd
@@ -36,7 +42,7 @@ COPY --from=builder /etc/group /etc/group
 WORKDIR /discord_channel_mirror_rs
 
 # Copy our build
-COPY --from=builder /discord_channel_mirror_rs/target/x86_64-unknown-linux-musl/release/discord_channel_mirror_rs ./
+COPY --from=builder /discord_channel_mirror_rs/target/release/discord_channel_mirror_rs ./
 
 # Use an unprivileged user.
 USER discord_channel_mirror_rs:discord_channel_mirror_rs
