@@ -1,50 +1,24 @@
-FROM rust:slim-buster AS builder
+FROM rust:slim-buster AS chef 
+# We only pay the installation cost once, 
+# it will be cached from the second build onwards
+RUN cargo install cargo-chef 
+RUN mkdir /app
+WORKDIR /app
 
-RUN update-ca-certificates
+FROM chef AS planner
+COPY . .
+RUN cargo chef prepare  --recipe-path recipe.json
 
-# Create appuser
-ENV USER=discord_channel_mirror_rs
-ENV UID=10001
-
-RUN adduser \
-    --disabled-password \
-    --gecos "" \
-    --home "/nonexistent" \
-    --shell "/sbin/nologin" \
-    --no-create-home \
-    --uid "${UID}" \
-    "${USER}"
-
-
-WORKDIR /discord_channel_mirror_rs
-
-# Build once with dummy data to cache build artifacts
-COPY ./Cargo.toml .
-COPY ./Cargo.lock .
-RUN mkdir ./src && echo 'fn main() { println!("Dummy!"); }' > ./src/main.rs
-RUN cargo build --release
-RUN rm -rf ./src
-
-# Now copy our stuff and build again
-COPY ./ .
-
+FROM chef AS builder
+COPY --from=planner /app/recipe.json recipe.json
+# Build dependencies - this is the caching Docker layer!
+RUN cargo chef cook --release --recipe-path recipe.json
+# Build application
+COPY . .
 RUN cargo build --release
 
-####################################################################################################
-## Final image
-####################################################################################################
-FROM debian:buster-slim
-
-# Import from builder.
-COPY --from=builder /etc/passwd /etc/passwd
-COPY --from=builder /etc/group /etc/group
-
-WORKDIR /discord_channel_mirror_rs
-
-# Copy our build
-COPY --from=builder /discord_channel_mirror_rs/target/release/discord_channel_mirror_rs ./
-
-# Use an unprivileged user.
-USER discord_channel_mirror_rs:discord_channel_mirror_rs
-
-CMD ["/discord_channel_mirror_rs/discord_channel_mirror_rs"]
+# We do not need the Rust toolchain to run the binary!
+FROM debian:buster-slim AS runtime
+WORKDIR /app
+COPY --from=builder /app/target/release/discord_channel_mirror_rs /usr/local/bin
+ENTRYPOINT ["/usr/local/bin/app"]
